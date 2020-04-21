@@ -1,6 +1,7 @@
 import hashlib
 import io
 import json
+import logging
 import os
 import socket
 
@@ -10,6 +11,11 @@ try:
     from urlparse import urlunparse
 except ImportError:
     from urllib.parse import urlunparse
+
+from smb.SMBConnection import SMBConnection
+from smb.base import OperationFailure
+from smb.smb2_constants import SMB2_FILE_ATTRIBUTE_DIRECTORY
+from nmb.NetBIOS import NetBIOS
 
 from dtoolcore.storagebroker import DiskStorageBroker
 
@@ -24,10 +30,10 @@ from dtoolcore.utils import (
 
 from dtoolcore.filehasher import FileHasher, md5sum_hexdigest, md5sum_digest
 
-from smb.SMBConnection import SMBConnection
-from smb.base import NotReadyError, NotConnectedError, OpeationFailure
-from smb.smb2_constants import SMB2_FILE_ATTRIBUTE_DIRECTORY
-from nmb.NetBIOS import NetBIOS
+from dtool_smb import __version__
+
+
+logger = logging.getLogger(__name__)
 
 
 _STRUCTURE_PARAMETERS = {
@@ -102,6 +108,10 @@ class SMBStorageBroker(DiskStorageBroker):
 
         self.uuid = uuid
 
+        # Connect to SMB server.
+        self.conn, self.service_name, self.path = \
+            SMBStorageBroker._connect(uri, config_path)
+
         # Define some other more abspaths.
         self._data_path = self._generate_path("data_directory")
         self._overlays_path = self._generate_path("overlays_directory")
@@ -115,37 +125,71 @@ class SMBStorageBroker(DiskStorageBroker):
             "metadata_fragments_directory"
         )
 
-        # Connect to SMB server.
-        self.conn, self.service_name, self.path = \
-            self._connect(uri, config_path)
 
-
-    def _connect(uri, config_path):
+    @classmethod
+    def _connect(cls, uri, config_path):
         parse_result = generous_parse_uri(uri)
 
         config_name = parse_result.netloc
 
         username = get_config_value(
-            "DTOOL_SMB_USERNAME_{}".format(self.config_name)
+            "DTOOL_SMB_USERNAME_{}".format(config_name),
+            config_path=config_path
         )
         password = get_config_value(
-            "DTOOL_SMB_PASSWORD_{}".format(self.config_name)
+            "DTOOL_SMB_PASSWORD_{}".format(config_name),
+            config_path=config_path
         )
         server_name = get_config_value(
-            "DTOOL_SMB_SERVER_NAME_{}".format(self.config_name)
+            "DTOOL_SMB_SERVER_NAME_{}".format(config_name),
+            config_path=config_path
         )
         server_port = get_config_value(
-            "DTOOL_SMB_SERVER_PORT_{}".format(self.config_name)
+            "DTOOL_SMB_SERVER_PORT_{}".format(config_name),
+            config_path=config_path
         )
         domain = get_config_value(
-            "DTOOL_SMB_DOMAIN_{}".format(self.config_name)
+            "DTOOL_SMB_DOMAIN_{}".format(config_name),
+            config_path=config_path
         )
         service_name = get_config_value(
-            "DTOOL_SMB_SERVICE_NAME_{}".format(self.config_name)
+            "DTOOL_SMB_SERVICE_NAME_{}".format(config_name),
+            config_path=config_path
         )
         path = get_config_value(
-            "DTOOL_SMB_PATH_{}".format(self.config_name)
+            "DTOOL_SMB_PATH_{}".format(config_name),
+            config_path=config_path
         )
+
+        if not username:
+            raise RuntimeError("No username specified for service '{name}', "
+                               "please set DTOOL_ECS_USERNAME_{name}."
+                               .format(name=self.config_name))
+        if not password:
+            raise RuntimeError("No password specified for service '{name}', "
+                               "please set DTOOL_ECS_PASSWORD_{name}."
+                               .format(name=self.config_name))
+        if not server_name:
+            raise RuntimeError("No server name specified for service '{name}', "
+                               "please set DTOOL_ECS_SERVER_NAME_{name}."
+                               .format(name=self.config_name))
+        if not server_port:
+            raise RuntimeError("No server port specified for service '{name}', "
+                               "please set DTOOL_ECS_SERVER_PORT_{name}."
+                               .format(name=self.config_name))
+        if not domain:
+            raise RuntimeError("No domain specified for service '{name}', "
+                               "please set DTOOL_ECS_DOMAIN_{name}."
+                               .format(name=self.config_name))
+        if not service_name:
+            raise RuntimeError("No service name specified for service '{name}', "
+                               "please set DTOOL_ECS_SERVICE_NAME_{name}. "
+                               "(The service name is the name of the 'share'.)"
+                               .format(name=self.config_name))
+        if not path:
+            raise RuntimeError("No path specified for service '{name}', "
+                               "please set DTOOL_ECS_PATH_{name}."
+                               .format(name=self.config_name))
 
         server_ip = socket.gethostbyname(server_name)
         host_name = socket.gethostname()
@@ -201,7 +245,8 @@ class SMBStorageBroker(DiskStorageBroker):
     def list_dataset_uris(cls, base_uri, config_path):
         """Return list containing URIs with base URI."""
 
-        conn, service_name, path = self,_connect(base_uri, config_path)
+        conn, service_name, path = \
+            SMBStorageBroker._connect(base_uri, config_path)
 
         files = conn.listPath(service_name, path)
 
@@ -303,7 +348,7 @@ class SMBStorageBroker(DiskStorageBroker):
         try:
             self.conn.getAttributes(self.service_name,
                 self.get_admin_metadata_key())
-        except OpeationFailure:
+        except OperationFailure:
             return False
         return True
 
@@ -341,7 +386,7 @@ class SMBStorageBroker(DiskStorageBroker):
         """Create necessary structure to hold a dataset."""
 
         # Ensure that the specified path does not exist and create it.
-        self.conn.createDirectory(self.service_name, self._path)
+        self.conn.createDirectory(self.service_name, self.path)
 
         # Create more essential subdirectories.
         for abspath in self._essential_subdirectories:
@@ -374,7 +419,7 @@ class SMBStorageBroker(DiskStorageBroker):
         if path is None:
             path = self._data_path
 
-        for shf in self.conn.listPath(self.service_name, path)
+        for shf in self.conn.listPath(self.service_name, path):
             if shf.file_attributes & SMB2_FILE_ATTRIBUTE_DIRECTORY:
                 self.iter_item_handles(path=shf.filename)
             yield shf.filename
@@ -437,7 +482,7 @@ class SMBStorageBroker(DiskStorageBroker):
         caches to remove repetitive time consuming calls
         """
         allowed = set([v[0] for v in _STRUCTURE_PARAMETERS.values()])
-        for d in self.conn.listPath(self.service_name, self._path):
+        for d in self.conn.listPath(self.service_name, self.path):
             if d.filename not in allowed:
                 msg = "Rogue content in base of dataset: {}".format(d.filename)
                 raise(SMBStorageBrokerValidationWarning(msg))
@@ -455,8 +500,8 @@ class SMBStorageBroker(DiskStorageBroker):
 
     def _list_historical_readme_keys(self):
         historical_readme_keys = []
-        for shf in self.conn.listPaths(self.service_name, self._path):
+        for shf in self.conn.listPaths(self.service_name, self.path):
             if shf.filename.startswith("README.yml-"):
-                key = os.path.join(self._path, shf.filename)
+                key = os.path.join(self.path, shf.filename)
                 historical_readme_keys.append(key)
         return historical_readme_keys
