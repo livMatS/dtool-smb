@@ -1,3 +1,4 @@
+import datetime
 import hashlib
 import io
 import json
@@ -24,7 +25,6 @@ from dtoolcore.storagebroker import StorageBrokerOSError
 from dtoolcore.utils import (
     generate_identifier,
     get_config_value,
-    mkdir_parents,
     generous_parse_uri,
     timestamp,
     DEFAULT_CACHE_PATH,
@@ -244,7 +244,13 @@ class SMBStorageBroker(DiskStorageBroker):
             *self._structure_parameters[structure_dict_key])
 
     def _fpath_from_handle(self, handle):
-        return os.path.join(self._data_abspath, handle)
+        return os.path.join(self._data_path, handle)
+
+    def _handle_to_fragment_prefixpath(self, handle):
+        stem = generate_identifier(handle)
+        logger.debug("_handle_to_fragment_prefixpath, handle='{}', stem='{}'"
+            .format(handle, stem))
+        return os.path.join(self._metadata_fragments_path, stem)
 
     def _path_exists(self, path):
         try:
@@ -276,11 +282,12 @@ class SMBStorageBroker(DiskStorageBroker):
 
         uri_list = []
         for f in files:
-            if f.file_attributes & ATTR_NORMAL:
-                uuid = f.filename
+            if f.filename != '.' and f.filename != '..':
+                if f.file_attributes & ATTR_DIRECTORY:
+                    uuid = f.filename
 
-                uri = cls.generate_uri(None, uuid, base_uri)
-                uri_list.append(uri)
+                    uri = cls.generate_uri(None, uuid, base_uri)
+                    uri_list.append(uri)
 
         return uri_list
 
@@ -329,17 +336,16 @@ class SMBStorageBroker(DiskStorageBroker):
         logger.debug("get_text, key='{}'".format(key))
         f = io.StringIO()
         self.conn.retrieveFile(self.service_name, key, f)
-        return f.read()
+        return f.getvalue()
 
     def put_text(self, key, text):
         """Put the text into the storage associated with the key."""
+        logger.debug("put_text, key='{}', text='{}'".format(key, text))
         parent_directory = os.path.dirname(key)
         if not self._path_exists(parent_directory):
             self.conn.createDirectory(self.service_name, parent_directory)
 
-        mkdir_parents(parent_directory)
-        f = io.StringIO()
-        f.write(text)
+        f = io.BytesIO(text.encode('utf-8'))
         self.conn.storeFile(self.service_name, key, f)
 
     def delete_key(self, key):
@@ -361,11 +367,12 @@ class SMBStorageBroker(DiskStorageBroker):
 
     def get_hash(self, handle):
         """Return the hash."""
+        logger.debug("get_hash, handle='{}'".format(handle))
         fpath = self._fpath_from_handle(handle)
         f = io.BytesIO()
         self.conn.retrieveFile(self.service_name, fpath, f)
         hasher = hashlib.md5()
-        hasher.update(f)
+        hasher.update(f.getvalue())
         return hasher.hexdigest()
 
     def has_admin_metadata(self):
@@ -378,8 +385,9 @@ class SMBStorageBroker(DiskStorageBroker):
     def _list_names(self, path):
         names = []
         for shf in self.conn.listPath(self.service_name, path):
-            name, ext = os.path.splitext(shf.filename)
-            names.append(name)
+            if shf.file_attributes & ATTR_NORMAL:
+                name, ext = os.path.splitext(shf.filename)
+                names.append(name)
         return names
 
     def list_overlay_names(self):
@@ -438,6 +446,9 @@ class SMBStorageBroker(DiskStorageBroker):
         :returns: the handle given to the item
         """
 
+        logger.debug("put_item, fpath='{}', relpath='{}'".format(fpath,
+            relpath))
+
         # Define the destination path and make any missing parent directories.
         dest_path = os.path.join(self._data_path, relpath)
         dirname = os.path.dirname(dest_path)
@@ -445,7 +456,7 @@ class SMBStorageBroker(DiskStorageBroker):
             self.conn.createDirectory(self.service_name, dirname)
 
         # Copy the file across.
-        self.conn.storeFile(fpath, dest_path)
+        self.conn.storeFile(self.service_name, dest_path, open(fpath, 'rb'))
 
         return relpath
 
@@ -456,9 +467,11 @@ class SMBStorageBroker(DiskStorageBroker):
             path = self._data_path
 
         for shf in self.conn.listPath(self.service_name, path):
-            if shf.file_attributes & ATTR_DIRECTORY:
-                self.iter_item_handles(path=shf.filename)
-            yield shf.filename
+            if shf.filename != '.' and shf.filename != '..':
+                if shf.file_attributes & ATTR_DIRECTORY:
+                    self.iter_item_handles(path=shf.filename)
+                else:
+                    yield shf.filename
 
     def add_item_metadata(self, handle, key, value):
         """Store the given key:value pair for the item associated with handle.
@@ -472,7 +485,8 @@ class SMBStorageBroker(DiskStorageBroker):
             self.conn.createDirectory(self.service_name,
                 self._metadata_fragments_path)
 
-        prefix = self._handle_to_fragment_absprefixpath(handle)
+        prefix = self._handle_to_fragment_prefixpath(handle)
+        logger.debug("add_item_metadata, prefix='{}'".format(prefix))
         fpath = prefix + '.{}.json'.format(key)
 
         f = io.BytesIO()
@@ -490,11 +504,20 @@ class SMBStorageBroker(DiskStorageBroker):
         :returns: dictionary containing item metadata
         """
 
-        prefix = self._handle_to_fragment_absprefixpath(handle)
+        try:
+            if not self.conn.getAttributes(self.service_name,
+                self._metadata_fragments_path).file_attributes & ATTR_DIRECTORY:
+                return {}
+        except OperationFailure:
+            return {}
+
+        prefix = self._handle_to_fragment_prefixpath(handle)
+        logger.debug("get_item_metadata, prefix='{}'".format(prefix))
 
         def list_paths(dirname):
             for shf in self.conn.listPath(self.service_name, dirname):
-                yield os.path.join(dirname, shf.filename)
+                if shf.file_attributes & ATTR_NORMAL:
+                    yield os.path.join(dirname, shf.filename)
 
         files = [f for f in list_paths(self._metadata_fragments_path)
                  if f.startswith(prefix)]
@@ -504,6 +527,7 @@ class SMBStorageBroker(DiskStorageBroker):
             key = filename.split('.')[-2]  # filename: identifier.key.json
             f = io.StringIO()
             self.conn.retrieveFile(self.service_name, filename, f)
+            f.seek(0)
             value = json.load(f)
             metadata[key] = value
 
@@ -519,10 +543,12 @@ class SMBStorageBroker(DiskStorageBroker):
         caches to remove repetitive time consuming calls
         """
         allowed = set([v[0] for v in _STRUCTURE_PARAMETERS.values()])
+        logger.debug('pre_freeze_hook, allowed = {}'.format(allowed))
         for d in self.conn.listPath(self.service_name, self.path):
-            if d.filename not in allowed:
-                msg = "Rogue content in base of dataset: {}".format(d.filename)
-                raise(SMBStorageBrokerValidationWarning(msg))
+            logger.debug("pre_freeze_hook, d.filename='{}'".format(d.filename))
+            if d.file_attributes & ATTR_NORMAL and d.filename not in allowed:
+                raise SMBStorageBrokerValidationWarning("Rogue content in base "
+                    "of dataset: {}".format(d.filename))
 
     def post_freeze_hook(self):
         """Post :meth:`dtoolcore.ProtoDataSet.freeze` cleanup actions.
@@ -533,11 +559,12 @@ class SMBStorageBroker(DiskStorageBroker):
         In the :class:`dtoolcore.storage_broker.DiskStorageBroker` it removes
         the temporary directory for storing item metadata fragment files.
         """
-        self.conn.deleteFiles(self.service_name, self._metadata_fragments_path)
+        if self._path_exists(self._metadata_fragments_path):
+            self.conn.deleteFiles(self.service_name, self._metadata_fragments_path)
 
     def _list_historical_readme_keys(self):
         historical_readme_keys = []
-        for shf in self.conn.listPaths(self.service_name, self.path):
+        for shf in self.conn.listPath(self.service_name, self.path):
             if shf.filename.startswith("README.yml-"):
                 key = os.path.join(self.path, shf.filename)
                 historical_readme_keys.append(key)
