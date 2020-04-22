@@ -39,15 +39,15 @@ logger = logging.getLogger(__name__)
 _STRUCTURE_PARAMETERS = {
     "data_directory": ["data"],
     "dataset_readme_relpath": ["README.yml"],
-    "dtool_directory": [".dtool"],
-    "admin_metadata_relpath": [".dtool", "dtool"],
-    "structure_metadata_relpath": [".dtool", "structure.json"],
-    "dtool_readme_relpath": [".dtool", "README.txt"],
-    "manifest_relpath": [".dtool", "manifest.json"],
-    "overlays_directory": [".dtool", "overlays"],
-    "annotations_directory": [".dtool", "annotations"],
-    "tags_directory": [".dtool", "tags"],
-    "metadata_fragments_directory": [".dtool", "tmp_fragments"],
+    "dtool_directory": ["_dtool"],
+    "admin_metadata_relpath": ["_dtool", "dtool"],
+    "structure_metadata_relpath": ["_dtool", "structure.json"],
+    "dtool_readme_relpath": ["_dtool", "README.txt"],
+    "manifest_relpath": ["_dtool", "manifest.json"],
+    "overlays_directory": ["_dtool", "overlays"],
+    "annotations_directory": ["_dtool", "annotations"],
+    "tags_directory": ["_dtool", "tags"],
+    "metadata_fragments_directory": ["_dtool", "tmp_fragments"],
     "storage_broker_version": __version__,
 }
 
@@ -96,6 +96,9 @@ class SMBStorageBroker(DiskStorageBroker):
     #: function name to the manifest.
     hasher = FileHasher(md5sum_hexdigest)
 
+    # Attribute used to define the structure of the dataset.
+    _structure_parameters = _STRUCTURE_PARAMETERS
+
     # Attribute used to document the structure of the dataset.
     _dtool_readme_txt = _DTOOL_README_TXT
 
@@ -124,6 +127,15 @@ class SMBStorageBroker(DiskStorageBroker):
         self._metadata_fragments_path = self._generate_path(
             "metadata_fragments_directory"
         )
+
+        # Define some essential directories to be created.
+        self._essential_subdirectories = [
+            self._generate_path("dtool_directory"),
+            self._data_path,
+            self._overlays_path,
+            self._annotations_path,
+            self._tags_path,
+        ]
 
 
     @classmethod
@@ -393,10 +405,17 @@ class SMBStorageBroker(DiskStorageBroker):
         """Create necessary structure to hold a dataset."""
 
         # Ensure that the specified path does not exist and create it.
-        self.conn.createDirectory(self.service_name, self.path)
+        logger.debug(
+            "_create_structure, creating directory '{}' on share '{}'." \
+            .format(os.path.join(self.path, self.uuid), self.service_name))
+        self.conn.createDirectory(self.service_name,
+            os.path.join(self.path, self.uuid))
 
         # Create more essential subdirectories.
         for abspath in self._essential_subdirectories:
+            logger.debug(
+                "_create_structure, creating directory '{}' on share '{}'." \
+                .format(abspath, self.service_name))
             self.conn.createDirectory(self.service_name, abspath)
 
     def put_item(self, fpath, relpath):
