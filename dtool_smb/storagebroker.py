@@ -19,6 +19,8 @@ from nmb.NetBIOS import NetBIOS
 
 from dtoolcore.storagebroker import DiskStorageBroker
 
+from dtoolcore.filehasher import FileHasher, md5sum_hexdigest, md5sum_digest
+from dtoolcore.storagebroker import StorageBrokerOSError
 from dtoolcore.utils import (
     generate_identifier,
     get_config_value,
@@ -27,8 +29,6 @@ from dtoolcore.utils import (
     timestamp,
     DEFAULT_CACHE_PATH,
 )
-
-from dtoolcore.filehasher import FileHasher, md5sum_hexdigest, md5sum_digest
 
 from dtool_smb import __version__
 
@@ -246,6 +246,13 @@ class SMBStorageBroker(DiskStorageBroker):
     def _fpath_from_handle(self, handle):
         return os.path.join(self._data_abspath, handle)
 
+    def _path_exists(self, path):
+        try:
+            self.conn.getAttributes(self.service_name, path)
+        except OperationFailure:
+            return False
+        return True
+
     # Class methods to override.
 
     @classmethod
@@ -327,7 +334,8 @@ class SMBStorageBroker(DiskStorageBroker):
     def put_text(self, key, text):
         """Put the text into the storage associated with the key."""
         parent_directory = os.path.dirname(key)
-        self.conn.createDirectory(self.service_name, parent_directory)
+        if not self._path_exists(parent_directory):
+            self.conn.createDirectory(self.service_name, parent_directory)
 
         mkdir_parents(parent_directory)
         f = io.StringIO()
@@ -364,12 +372,7 @@ class SMBStorageBroker(DiskStorageBroker):
 
         This is the definition of being a "dataset".
         """
-        try:
-            self.conn.getAttributes(self.service_name,
-                self.get_admin_metadata_key())
-        except OperationFailure:
-            return False
-        return True
+        return self._path_exists(self.get_admin_metadata_key())
 
     def _list_names(self, path):
         names = []
@@ -403,13 +406,18 @@ class SMBStorageBroker(DiskStorageBroker):
 
     def _create_structure(self):
         """Create necessary structure to hold a dataset."""
+        uuid_path = os.path.join(self.path, self.uuid)
 
         # Ensure that the specified path does not exist and create it.
+        if self._path_exists(uuid_path):
+            raise StorageBrokerOSError(
+                "Path '{}' already exists on share '{}'.".format(uuid_path,
+                    self.service_name))
+
         logger.debug(
             "_create_structure, creating directory '{}' on share '{}'." \
             .format(os.path.join(self.path, self.uuid), self.service_name))
-        self.conn.createDirectory(self.service_name,
-            os.path.join(self.path, self.uuid))
+        self.conn.createDirectory(self.service_name, uuid_path)
 
         # Create more essential subdirectories.
         for abspath in self._essential_subdirectories:
@@ -432,7 +440,8 @@ class SMBStorageBroker(DiskStorageBroker):
         # Define the destination path and make any missing parent directories.
         dest_path = os.path.join(self._data_path, relpath)
         dirname = os.path.dirname(dest_path)
-        self.conn.createDirectory(self.service_name, dirname)
+        if not self._path_exists(dirname):
+            self.conn.createDirectory(self.service_name, dirname)
 
         # Copy the file across.
         self.conn.storeFile(fpath, dest_path)
@@ -458,8 +467,9 @@ class SMBStorageBroker(DiskStorageBroker):
         :param key: metadata key
         :param value: metadata value
         """
-        self.conn.createDirectory(self.service_name,
-            self._metadata_fragments_path)
+        if not self._path_exists(self._metadata_fragments_path):
+            self.conn.createDirectory(self.service_name,
+                self._metadata_fragments_path)
 
         prefix = self._handle_to_fragment_absprefixpath(handle)
         fpath = prefix + '.{}.json'.format(key)
