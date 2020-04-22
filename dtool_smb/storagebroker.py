@@ -14,7 +14,7 @@ except ImportError:
 
 from smb.SMBConnection import SMBConnection
 from smb.base import OperationFailure
-from smb.smb2_constants import SMB2_FILE_ATTRIBUTE_DIRECTORY
+from smb.smb_constants import (ATTR_DIRECTORY, ATTR_NORMAL)
 from nmb.NetBIOS import NetBIOS
 
 from dtoolcore.storagebroker import DiskStorageBroker
@@ -199,7 +199,7 @@ class SMBStorageBroker(DiskStorageBroker):
 
         logger.info( ( "Connecting from '{host:s}' to "
             "'smb://{user:s}@{ip:s}({server:s}):{port:d}', "
-            " DOMAIN '{domain:s}'").format(user=username,
+            "DOMAIN '{domain:s}'").format(user=username,
                 ip=server_ip, server=server_name, 
                 port=server_port, host=host_name, 
                 domain=domain) )
@@ -223,6 +223,11 @@ class SMBStorageBroker(DiskStorageBroker):
     # Generic helper functions.
 
     def _generate_path(self, structure_dict_key):
+        logger.debug("_generate_path, structure_dict_key='{}'"
+            .format(structure_dict_key))
+        logger.debug("_generate_path, self.path='{}', self.uuid='{}', {}"
+            .format(self.path, self.uuid,
+                self._structure_parameters[structure_dict_key]))
         return os.path.join(self.path, self.uuid,
             *self._structure_parameters[structure_dict_key])
 
@@ -252,10 +257,11 @@ class SMBStorageBroker(DiskStorageBroker):
 
         uri_list = []
         for f in files:
-            uuid = f.filename
+            if f.file_attributes & ATTR_NORMAL:
+                uuid = f.filename
 
-            uri = cls.generate_uri(None, uuid, base_uri)
-            uri_list.append(uri)
+                uri = cls.generate_uri(None, uuid, base_uri)
+                uri_list.append(uri)
 
         return uri_list
 
@@ -301,6 +307,7 @@ class SMBStorageBroker(DiskStorageBroker):
 
     def get_text(self, key):
         """Return the text associated with the key."""
+        logger.debug("get_text, key='{}'".format(key))
         f = io.StringIO()
         self.conn.retrieveFile(self.service_name, key, f)
         return f.read()
@@ -420,7 +427,7 @@ class SMBStorageBroker(DiskStorageBroker):
             path = self._data_path
 
         for shf in self.conn.listPath(self.service_name, path):
-            if shf.file_attributes & SMB2_FILE_ATTRIBUTE_DIRECTORY:
+            if shf.file_attributes & ATTR_DIRECTORY:
                 self.iter_item_handles(path=shf.filename)
             yield shf.filename
 
