@@ -102,6 +102,9 @@ class SMBStorageBroker(DiskStorageBroker):
     # Attribute used to document the structure of the dataset.
     _dtool_readme_txt = _DTOOL_README_TXT
 
+    # Encoding
+    _encoding = 'utf-8'
+
     def __init__(self, uri, config_path=None):
 
         parse_result = generous_parse_uri(uri)
@@ -334,9 +337,9 @@ class SMBStorageBroker(DiskStorageBroker):
     def get_text(self, key):
         """Return the text associated with the key."""
         logger.debug("get_text, key='{}'".format(key))
-        f = io.StringIO()
+        f = io.BytesIO()
         self.conn.retrieveFile(self.service_name, key, f)
-        return f.getvalue()
+        return f.getvalue().decode(self._encoding)
 
     def put_text(self, key, text):
         """Put the text into the storage associated with the key."""
@@ -345,7 +348,7 @@ class SMBStorageBroker(DiskStorageBroker):
         if not self._path_exists(parent_directory):
             self.conn.createDirectory(self.service_name, parent_directory)
 
-        f = io.BytesIO(text.encode('utf-8'))
+        f = io.BytesIO(text.encode(self._encoding))
         self.conn.storeFile(self.service_name, key, f)
 
     def delete_key(self, key):
@@ -465,13 +468,28 @@ class SMBStorageBroker(DiskStorageBroker):
 
         if path is None:
             path = self._data_path
+        relpaths = [None]
 
-        for shf in self.conn.listPath(self.service_name, path):
-            if shf.filename != '.' and shf.filename != '..':
-                if shf.file_attributes & ATTR_DIRECTORY:
-                    self.iter_item_handles(path=shf.filename)
-                else:
-                    yield shf.filename
+        while len(relpaths) > 0:
+            relpath = relpaths.pop()
+            logger.debug("iter_item_handles, path='{}', relpath='{}'"
+                .format(path, relpath))
+            if relpath is None:
+                fullpath = path
+            else:
+                fullpath = os.path.join(path, relpath)
+            for shf in self.conn.listPath(self.service_name, fullpath):
+                logger.debug("iter_item_handles, shf.filename='{}', DIRECTORY={}"
+                    .format(shf.filename, shf.file_attributes & ATTR_DIRECTORY))
+                if shf.filename != '.' and shf.filename != '..':
+                    if relpath is None:
+                        new_relpath = shf.filename
+                    else:
+                        new_relpath = os.path.join(relpath, shf.filename)
+                    if shf.file_attributes & ATTR_DIRECTORY:
+                        relpaths.append(new_relpath)
+                    else:
+                        yield new_relpath
 
     def add_item_metadata(self, handle, key, value):
         """Store the given key:value pair for the item associated with handle.
@@ -544,7 +562,8 @@ class SMBStorageBroker(DiskStorageBroker):
         """
         allowed = set([v[0] for v in _STRUCTURE_PARAMETERS.values()])
         logger.debug('pre_freeze_hook, allowed = {}'.format(allowed))
-        for d in self.conn.listPath(self.service_name, self.path):
+        for d in self.conn.listPath(self.service_name,
+            os.path.join(self.path, self.uuid)):
             logger.debug("pre_freeze_hook, d.filename='{}'".format(d.filename))
             if d.file_attributes & ATTR_NORMAL and d.filename not in allowed:
                 raise SMBStorageBrokerValidationWarning("Rogue content in base "
