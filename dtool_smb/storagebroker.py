@@ -348,7 +348,8 @@ class SMBStorageBroker(DiskStorageBroker):
 
     def get_size_in_bytes(self, handle):
         """Return the size in bytes."""
-        return self.conn.getAttributes(self.service_name, key).file_size
+        fpath = self._fpath_from_handle(handle)
+        return self.conn.getAttributes(self.service_name, fpath).file_size
 
     def get_utc_timestamp(self, handle):
         """Return the UTC timestamp."""
