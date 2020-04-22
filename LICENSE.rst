@@ -1,7 +1,10 @@
 MIT License
 ===========
 
-Copyright (c) 2020 Lars Pastewka
+Copyright (c) 2017 Tjelvar Olsson
+              2020 Johannes Hörmann
+              2020 Wolfram Nöhring
+              2020 Lars Pastewka
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

@@ -35,4 +35,4 @@ Security
 [0.1.0] - 2020-03-19
 --------------------
 
-Initial release.
+Initial release, derive from AzureStorageBroke and DiskStorageBroke of dtool.
