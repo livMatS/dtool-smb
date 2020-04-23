@@ -181,33 +181,33 @@ class SMBStorageBroker(BaseStorageBroker):
 
         if not username:
             raise RuntimeError("No username specified for service '{name}', "
-                               "please set DTOOL_ECS_USERNAME_{name}."
-                               .format(name=self.config_name))
+                               "please set DTOOL_SMB_USERNAME_{name}."
+                               .format(name=config_name))
         if not password:
             raise RuntimeError("No password specified for service '{name}', "
-                               "please set DTOOL_ECS_PASSWORD_{name}."
-                               .format(name=self.config_name))
+                               "please set DTOOL_SMB_PASSWORD_{name}."
+                               .format(name=config_name))
         if not server_name:
             raise RuntimeError("No server name specified for service '{name}', "
-                               "please set DTOOL_ECS_SERVER_NAME_{name}."
-                               .format(name=self.config_name))
+                               "please set DTOOL_SMB_SERVER_NAME_{name}."
+                               .format(name=config_name))
         if not server_port:
             raise RuntimeError("No server port specified for service '{name}', "
-                               "please set DTOOL_ECS_SERVER_PORT_{name}."
-                               .format(name=self.config_name))
+                               "please set DTOOL_SMB_SERVER_PORT_{name}."
+                               .format(name=config_name))
         if not domain:
             raise RuntimeError("No domain specified for service '{name}', "
-                               "please set DTOOL_ECS_DOMAIN_{name}."
-                               .format(name=self.config_name))
+                               "please set DTOOL_SMB_DOMAIN_{name}."
+                               .format(name=config_name))
         if not service_name:
             raise RuntimeError("No service name specified for service '{name}', "
-                               "please set DTOOL_ECS_SERVICE_NAME_{name}. "
+                               "please set DTOOL_SMB_SERVICE_NAME_{name}. "
                                "(The service name is the name of the 'share'.)"
-                               .format(name=self.config_name))
+                               .format(name=config_name))
         if not path:
             raise RuntimeError("No path specified for service '{name}', "
-                               "please set DTOOL_ECS_PATH_{name}."
-                               .format(name=self.config_name))
+                               "please set DTOOL_SMB_PATH_{name}."
+                               .format(name=config_name))
 
         server_ip = socket.gethostbyname(server_name)
         host_name = socket.gethostname()
