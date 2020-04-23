@@ -28,7 +28,22 @@ To install the dtool-smb package::
 Configuration
 -------------
 
-ADD DOCUMENTATION FOR CONFIGURATION
+Then create the file ``.config/dtool/dtool.json`` and add the SMB account using the format below::
+
+    ```
+    {
+      "DTOOL_SMB_USERNAME_jicinformatics": "<username>",
+      "DTOOL_SMB_PASSWORD_jicinformatics": "<password>",
+      "DTOOL_SMB_SERVER_NAME_jicinformatics": "<server-name>",
+      "DTOOL_SMB_SERVER_PORT_jicinformatics": <server-port>,
+      "DTOOL_SMB_DOMAIN_jicinformatics": "<smb-domain>",
+      "DTOOL_SMB_SERVICE_NAME_jicinformatics": "<smb-share>",
+      "DTOOL_SMB_PATH_jicinformatics": "<path-within-share>"
+    }
+    ```
+
+Note that <server-port> is typically 445. The name of the 'share' is specified through the
+``DTOOL_SMB_SERVICE_NAME_*`` key.
 
 Usage
 -----
