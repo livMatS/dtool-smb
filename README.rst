@@ -48,7 +48,7 @@ Note that <server-port> is typically 445. The name of the 'share' is specified t
 Usage
 -----
 
-To copy a dataset from local disk (``my-dataset``) to an Azure storage account
+To copy a dataset from local disk (``my-dataset``) to an SMB storage account
 (``jicinformatics``) one can use the command below::
 
     dtool cp ./my-dataset smb://jicinformatics/
