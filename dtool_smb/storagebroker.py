@@ -265,6 +265,16 @@ class SMBStorageBroker(BaseStorageBroker):
             return False
         return True
 
+    def _create_directory(self, path):
+        paths = []
+        while not self._path_exists(path):
+            paths += [path]
+            path = os.path.dirname(path)
+        while len(paths) > 0:
+            path = paths.pop()
+            logger.debug("_create_directory, path = '{}'".format(path))
+            self.conn.createDirectory(self.service_name, path)
+
     # Class methods to override.
 
     @classmethod
@@ -348,8 +358,7 @@ class SMBStorageBroker(BaseStorageBroker):
         """Put the text into the storage associated with the key."""
         logger.debug("put_text, key='{}', text='{}'".format(key, text))
         parent_directory = os.path.dirname(key)
-        if not self._path_exists(parent_directory):
-            self.conn.createDirectory(self.service_name, parent_directory)
+        self._create_directory(parent_directory)
 
         f = io.BytesIO(text.encode(self._encoding))
         self.conn.storeFile(self.service_name, key, f)
@@ -440,14 +449,14 @@ class SMBStorageBroker(BaseStorageBroker):
         logger.debug(
             "_create_structure, creating directory '{}' on share '{}'." \
             .format(os.path.join(self.path, self.uuid), self.service_name))
-        self.conn.createDirectory(self.service_name, uuid_path)
+        self._create_directory(uuid_path)
 
         # Create more essential subdirectories.
         for abspath in self._essential_subdirectories:
             logger.debug(
                 "_create_structure, creating directory '{}' on share '{}'." \
                 .format(abspath, self.service_name))
-            self.conn.createDirectory(self.service_name, abspath)
+            self._create_directory(abspath)
 
     def put_item(self, fpath, relpath):
         """Put item with content from fpath at relpath in dataset.
@@ -466,8 +475,7 @@ class SMBStorageBroker(BaseStorageBroker):
         # Define the destination path and make any missing parent directories.
         dest_path = os.path.join(self._data_path, relpath)
         dirname = os.path.dirname(dest_path)
-        if not self._path_exists(dirname):
-            self.conn.createDirectory(self.service_name, dirname)
+        self._create_directory(dirname)
 
         # Copy the file across.
         self.conn.storeFile(self.service_name, dest_path, open(fpath, 'rb'))
@@ -513,9 +521,7 @@ class SMBStorageBroker(BaseStorageBroker):
         :param key: metadata key
         :param value: metadata value
         """
-        if not self._path_exists(self._metadata_fragments_path):
-            self.conn.createDirectory(self.service_name,
-                self._metadata_fragments_path)
+        self._create_directory(self._metadata_fragments_path)
 
         prefix = self._handle_to_fragment_prefixpath(handle)
         logger.debug("add_item_metadata, prefix='{}'".format(prefix))
