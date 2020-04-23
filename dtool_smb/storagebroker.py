@@ -15,7 +15,7 @@ except ImportError:
 
 from smb.SMBConnection import SMBConnection
 from smb.base import OperationFailure
-from smb.smb_constants import (ATTR_DIRECTORY, ATTR_NORMAL)
+from smb.smb_constants import ATTR_DIRECTORY, ATTR_NORMAL
 from nmb.NetBIOS import NetBIOS
 
 from dtoolcore.storagebroker import BaseStorageBroker, DiskStorageBroker
@@ -139,6 +139,9 @@ class SMBStorageBroker(BaseStorageBroker):
             self._annotations_path,
             self._tags_path,
         ]
+
+        # Cache for file hashes computed on upload
+        self._hash_cache = {}
 
 
     @classmethod
@@ -371,12 +374,20 @@ class SMBStorageBroker(BaseStorageBroker):
     def get_hash(self, handle):
         """Return the hash."""
         logger.debug("get_hash, handle='{}'".format(handle))
+        logger.debug("get_hash, hash_cache={}".format(self._hash_cache))
         fpath = self._fpath_from_handle(handle)
-        f = io.BytesIO()
-        self.conn.retrieveFile(self.service_name, fpath, f)
-        hasher = hashlib.md5()
-        hasher.update(f.getvalue())
-        return hasher.hexdigest()
+        logger.debug("get_hash, fpath='{}'".format(fpath))
+        try:
+            return self._hash_cache[fpath]
+        except KeyError:
+            logger.debug("get_hash, fpath not found in cache")
+            f = io.BytesIO()
+            self.conn.retrieveFile(self.service_name, fpath, f)
+            hasher = hashlib.md5()
+            hasher.update(f.getvalue())
+            h = hasher.hexdigest()
+            self._hash_cache[fpath] = h
+            return h
 
     def has_admin_metadata(self):
         """Return True if the administrative metadata exists.
@@ -460,6 +471,9 @@ class SMBStorageBroker(BaseStorageBroker):
 
         # Copy the file across.
         self.conn.storeFile(self.service_name, dest_path, open(fpath, 'rb'))
+
+        # Compute hash and store to cache
+        self._hash_cache[dest_path] = SMBStorageBroker.hasher(fpath)
 
         return relpath
 
