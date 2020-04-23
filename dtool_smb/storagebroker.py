@@ -18,7 +18,7 @@ from smb.base import OperationFailure
 from smb.smb_constants import (ATTR_DIRECTORY, ATTR_NORMAL)
 from nmb.NetBIOS import NetBIOS
 
-from dtoolcore.storagebroker import DiskStorageBroker
+from dtoolcore.storagebroker import BaseStorageBroker, DiskStorageBroker
 
 from dtoolcore.filehasher import FileHasher, md5sum_hexdigest, md5sum_digest
 from dtoolcore.storagebroker import StorageBrokerOSError
@@ -87,7 +87,7 @@ class SMBStorageBrokerValidationWarning(Warning):
     pass
 
 
-class SMBStorageBroker(DiskStorageBroker):
+class SMBStorageBroker(BaseStorageBroker):
 
     #: Attribute used to define the type of storage broker.
     key = "smb"
