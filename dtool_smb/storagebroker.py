@@ -162,10 +162,10 @@ class SMBStorageBroker(BaseStorageBroker):
             "DTOOL_SMB_SERVER_NAME_{}".format(config_name),
             config_path=config_path
         )
-        server_port = get_config_value(
+        server_port = int(get_config_value(
             "DTOOL_SMB_SERVER_PORT_{}".format(config_name),
             config_path=config_path
-        )
+        ))  # server_port might be string if specified via env vars
         domain = get_config_value(
             "DTOOL_SMB_DOMAIN_{}".format(config_name),
             config_path=config_path
@@ -218,19 +218,19 @@ class SMBStorageBroker(BaseStorageBroker):
         logger.info( ( "Connecting from '{host:s}' to "
             "'smb://{user:s}@{ip:s}({server:s}):{port:d}', "
             "DOMAIN '{domain:s}'").format(user=username,
-                ip=server_ip, server=server_name, 
-                port=server_port, host=host_name, 
+                ip=server_ip, server=server_name,
+                port=server_port, host=host_name,
                 domain=domain) )
 
         # for testing, see types of arguments
         logger.debug( ( "Types HOST '{host:s}', USER '{user:s}', IP '{ip:s}', "
            "SERVER '{server:s}', PORT '{port:s}', DOMAIN '{domain:s}', "
             "PASSWORD '{password:s}'").format(
-                user=type(username).__name__, 
-                ip=type(server_ip).__name__, 
-                server=type(server_name).__name__, 
-                port=type(server_port).__name__, 
-                host=type(host_name).__name__, 
+                user=type(username).__name__,
+                ip=type(server_ip).__name__,
+                server=type(server_name).__name__,
+                port=type(server_port).__name__,
+                host=type(host_name).__name__,
                 domain=type(domain).__name__,
                 password=type(password).__name__ ) )
 
