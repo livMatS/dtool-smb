@@ -162,10 +162,10 @@ class SMBStorageBroker(BaseStorageBroker):
             "DTOOL_SMB_SERVER_NAME_{}".format(config_name),
             config_path=config_path
         )
-        server_port = int(get_config_value(
+        server_port = get_config_value(
             "DTOOL_SMB_SERVER_PORT_{}".format(config_name),
             config_path=config_path
-        ))  # server_port might be string if specified via env vars
+        )
         domain = get_config_value(
             "DTOOL_SMB_DOMAIN_{}".format(config_name),
             config_path=config_path
@@ -208,6 +208,10 @@ class SMBStorageBroker(BaseStorageBroker):
             raise RuntimeError("No path specified for service '{name}', "
                                "please set DTOOL_SMB_PATH_{name}."
                                .format(name=config_name))
+
+        # server_port might be string, i.e. if specified via env vars
+        if not isinstance(server_port, int):
+            server_port = int(server_port)
 
         server_ip = socket.gethostbyname(server_name)
         host_name = socket.gethostname()
