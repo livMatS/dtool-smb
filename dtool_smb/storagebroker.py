@@ -83,7 +83,6 @@ Dataset key/value pairs metadata prefixed by: annotations/
 Dataset tags metadata prefixed by: tags/
 """
 
-
 class SMBStorageBrokerValidationWarning(Warning):
     pass
 
@@ -145,7 +144,15 @@ class SMBStorageBroker(BaseStorageBroker):
         self._hash_cache = {}
 
 
+    def _count_calls(func):
+        def wrapper(*args, **kwargs):
+            wrapper.num_calls += 1
+            return func(*args, **kwargs)
+        wrapper.num_calls = 0
+        return wrapper
+
     @classmethod
+    @_count_calls
     def _connect(cls, uri, config_path):
         parse_result = generous_parse_uri(uri)
 
@@ -209,7 +216,12 @@ class SMBStorageBroker(BaseStorageBroker):
         server_ip = socket.gethostbyname(server_name)
         host_name = socket.gethostname()
 
-        conn = SMBConnection(username, getpass.getpass(), host_name, server_name,
+        if cls._connect.num_calls == 1:
+            password = getpass.getpass()
+            cls.password = password
+        else:
+            password = cls.password
+        conn = SMBConnection(username, password, host_name, server_name,
             domain=domain, use_ntlm_v2=True, is_direct_tcp=True)
 
         logger.info( ( "Connecting from '{host:s}' to "
@@ -227,7 +239,7 @@ class SMBStorageBroker(BaseStorageBroker):
                 server=type(server_name).__name__,
                 port=type(server_port).__name__,
                 host=type(host_name).__name__,
-                domain=type(domain).__name__)
+                domain=type(domain).__name__))
 
         conn.connect(server_ip, port=server_port)
 
@@ -603,3 +615,7 @@ class SMBStorageBroker(BaseStorageBroker):
                 key = os.path.join(self.path, shf.filename)
                 historical_readme_keys.append(key)
         return historical_readme_keys
+
+
+
+
