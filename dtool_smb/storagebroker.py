@@ -215,12 +215,16 @@ class SMBStorageBroker(BaseStorageBroker):
 
         server_ip = socket.gethostbyname(server_name)
         host_name = socket.gethostname()
-
-        if cls._connect.num_calls == 1:
-            password = getpass.getpass()
-            cls.password = password
-        else:
-            password = cls.password
+        password = get_config_value(
+            "DTOOL_SMB_PASSWORD_{}".format(config_name),
+            config_path=config_path
+        )
+        if password is None:
+            if cls._connect.num_calls == 1:
+                password = getpass.getpass()
+                cls.password = password
+            else:
+                password = cls.password
         conn = SMBConnection(username, password, host_name, server_name,
             domain=domain, use_ntlm_v2=True, is_direct_tcp=True)
 
