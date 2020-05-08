@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import socket
+import getpass
 
 from base64 import b64encode
 
@@ -82,7 +83,6 @@ Dataset key/value pairs metadata prefixed by: annotations/
 Dataset tags metadata prefixed by: tags/
 """
 
-
 class SMBStorageBrokerValidationWarning(Warning):
     pass
 
@@ -144,7 +144,15 @@ class SMBStorageBroker(BaseStorageBroker):
         self._hash_cache = {}
 
 
+    def _count_calls(func):
+        def wrapper(*args, **kwargs):
+            wrapper.num_calls += 1
+            return func(*args, **kwargs)
+        wrapper.num_calls = 0
+        return wrapper
+
     @classmethod
+    @_count_calls
     def _connect(cls, uri, config_path):
         parse_result = generous_parse_uri(uri)
 
@@ -152,10 +160,6 @@ class SMBStorageBroker(BaseStorageBroker):
 
         username = get_config_value(
             "DTOOL_SMB_USERNAME_{}".format(config_name),
-            config_path=config_path
-        )
-        password = get_config_value(
-            "DTOOL_SMB_PASSWORD_{}".format(config_name),
             config_path=config_path
         )
         server_name = get_config_value(
@@ -182,10 +186,6 @@ class SMBStorageBroker(BaseStorageBroker):
         if not username:
             raise RuntimeError("No username specified for service '{name}', "
                                "please set DTOOL_SMB_USERNAME_{name}."
-                               .format(name=config_name))
-        if not password:
-            raise RuntimeError("No password specified for service '{name}', "
-                               "please set DTOOL_SMB_PASSWORD_{name}."
                                .format(name=config_name))
         if not server_name:
             raise RuntimeError("No server name specified for service '{name}', "
@@ -215,7 +215,16 @@ class SMBStorageBroker(BaseStorageBroker):
 
         server_ip = socket.gethostbyname(server_name)
         host_name = socket.gethostname()
-
+        password = get_config_value(
+            "DTOOL_SMB_PASSWORD_{}".format(config_name),
+            config_path=config_path
+        )
+        if password is None:
+            if cls._connect.num_calls == 1:
+                password = getpass.getpass()
+                cls.password = password
+            else:
+                password = cls.password
         conn = SMBConnection(username, password, host_name, server_name,
             domain=domain, use_ntlm_v2=True, is_direct_tcp=True)
 
@@ -228,15 +237,13 @@ class SMBStorageBroker(BaseStorageBroker):
 
         # for testing, see types of arguments
         logger.debug( ( "Types HOST '{host:s}', USER '{user:s}', IP '{ip:s}', "
-           "SERVER '{server:s}', PORT '{port:s}', DOMAIN '{domain:s}', "
-            "PASSWORD '{password:s}'").format(
+           "SERVER '{server:s}', PORT '{port:s}', DOMAIN '{domain:s}'").format(
                 user=type(username).__name__,
                 ip=type(server_ip).__name__,
                 server=type(server_name).__name__,
                 port=type(server_port).__name__,
                 host=type(host_name).__name__,
-                domain=type(domain).__name__,
-                password=type(password).__name__ ) )
+                domain=type(domain).__name__))
 
         conn.connect(server_ip, port=server_port)
 

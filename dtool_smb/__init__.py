@@ -1,4 +1,4 @@
-"""dtool_azure package."""
+"""dtool_smb package."""
 
 import logging
 
