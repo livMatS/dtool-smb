@@ -619,7 +619,3 @@ class SMBStorageBroker(BaseStorageBroker):
                 key = os.path.join(self.path, shf.filename)
                 historical_readme_keys.append(key)
         return historical_readme_keys
-
-
-
-
