@@ -430,20 +430,21 @@ class SMBStorageBroker(BaseStorageBroker):
 
     def list_annotation_names(self):
         """Return list of annotation names."""
-        return self._list_names(self._annotation_path)
+        return self._list_names(self._annotations_path)
 
     def list_tags(self):
         """Return list of tags."""
         return self._list_names(self._tags_path)
 
-    def get_item_path(self, identifier):
+    def get_item_abspath(self, identifier):
         """Return absolute path at which item content can be accessed.
 
         :param identifier: item identifier
         :returns: absolute path from which the item content can be accessed
         """
+        # import re
         manifest = self.get_manifest()
-        relpath = hitem["relpath"]
+        relpath = manifest["items"][identifier]["relpath"]
         item_path = os.path.join(self._data_path, relpath)
         return item_path
 
@@ -468,6 +469,18 @@ class SMBStorageBroker(BaseStorageBroker):
                 "_create_structure, creating directory '{}' on share '{}'." \
                 .format(abspath, self.service_name))
             self._create_directory(abspath)
+
+    def get_item(self, identifier, fpath):
+        """Get item content by identifier and write to local file.
+
+        :param identifier:
+        :param fpath: file path.
+        :returns: file_path.
+        """
+        src_abspath = self.get_item_abspath(identifier)
+        with open(fpath, mode='wb') as f:
+            self.conn.retrieveFile(self.service_name, src_abspath, f)
+        return fpath
 
     def put_item(self, fpath, relpath):
         """Put item with content from fpath at relpath in dataset.
