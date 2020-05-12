@@ -425,7 +425,7 @@ class SMBStorageBroker(BaseStorageBroker):
     def _list_names(self, path):
         names = []
         for shf in self.conn.listPath(self.service_name, path):
-            if shf.file_attributes & ATTR_NORMAL:
+            if not shf.file_attributes & ATTR_DIRECTORY:
                 name, ext = os.path.splitext(shf.filename)
                 names.append(name)
         return names
