@@ -27,6 +27,7 @@ from dtoolcore.utils import (
     generate_identifier,
     get_config_value,
     generous_parse_uri,
+    mkdir_parents,
     timestamp,
     DEFAULT_CACHE_PATH,
 )
@@ -143,6 +144,11 @@ class SMBStorageBroker(BaseStorageBroker):
         # Cache for file hashes computed on upload
         self._hash_cache = {}
 
+        self._smb_cache_abspath = get_config_value(
+            "DTOOL_CACHE_DIRECTORY",
+            config_path=config_path,
+            default=DEFAULT_CACHE_PATH
+        )
 
     def _count_calls(func):
         def wrapper(*args, **kwargs):
@@ -430,22 +436,53 @@ class SMBStorageBroker(BaseStorageBroker):
 
     def list_annotation_names(self):
         """Return list of annotation names."""
-        return self._list_names(self._annotation_path)
+        return self._list_names(self._annotations_path)
 
     def list_tags(self):
         """Return list of tags."""
         return self._list_names(self._tags_path)
 
-    def get_item_path(self, identifier):
+    def get_item_abspath(self, identifier):
         """Return absolute path at which item content can be accessed.
 
         :param identifier: item identifier
         :returns: absolute path from which the item content can be accessed
         """
+        logger.debug("Get item abspath {} {}".format(identifier, self))
+
+        if not hasattr(self, "_admin_metadata_cache"):
+            self._admin_metadata_cache = self.get_admin_metadata()
+        admin_metadata = self._admin_metadata_cache
+
+        uuid = admin_metadata["uuid"]
+        # Create directory for the specific dataset.
+        dataset_cache_abspath = os.path.join(self._smb_cache_abspath, uuid)
+        mkdir_parents(dataset_cache_abspath)
+
         manifest = self.get_manifest()
-        relpath = hitem["relpath"]
-        item_path = os.path.join(self._data_path, relpath)
-        return item_path
+        item = manifest["items"][identifier]
+        relpath = item["relpath"]
+        _, ext = os.path.splitext(relpath)
+
+        smb_fpath = self._fpath_from_handle(relpath)
+
+        local_item_abspath = os.path.join(
+            dataset_cache_abspath,
+            identifier + ext
+        )
+        if not os.path.isfile(local_item_abspath):
+
+            tmp_local_item_abspath = local_item_abspath + ".tmp"
+
+            logger.debug("Retrieving file {} from {}" \
+                .format(smb_fpath, self.service_name))
+            self.conn.retrieveFile(self.service_name,
+                smb_fpath,
+                open(tmp_local_item_abspath, 'wb')
+            )
+            os.rename(tmp_local_item_abspath, local_item_abspath)
+
+        return local_item_abspath
 
     def _create_structure(self):
         """Create necessary structure to hold a dataset."""
