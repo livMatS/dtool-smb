@@ -476,10 +476,8 @@ class SMBStorageBroker(BaseStorageBroker):
 
             logger.debug("Retrieving file {} from {}" \
                 .format(smb_fpath, self.service_name))
-            self.conn.retrieveFile(self.service_name,
-                smb_fpath,
-                open(tmp_local_item_abspath, 'wb')
-            )
+            with open(tmp_local_item_abspath, 'wb') as f:
+                attr, size = self.conn.retrieveFile(self.service_name, smb_fpath, f)
             os.rename(tmp_local_item_abspath, local_item_abspath)
 
         return local_item_abspath
