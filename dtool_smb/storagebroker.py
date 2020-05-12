@@ -651,8 +651,10 @@ class SMBStorageBroker(BaseStorageBroker):
 
     def _list_historical_readme_keys(self):
         historical_readme_keys = []
-        for shf in self.conn.listPath(self.service_name, self.path):
+        uuid_path = os.path.join(self.path, self.uuid)
+        for shf in self.conn.listPath(self.service_name, uuid_path):
+            logger.debug('_list_historical_readme_keys, {}'.format(shf.filename))
             if shf.filename.startswith("README.yml-"):
-                key = os.path.join(self.path, shf.filename)
+                key = os.path.join(uuid_path, shf.filename)
                 historical_readme_keys.append(key)
         return historical_readme_keys
