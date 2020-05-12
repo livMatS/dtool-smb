@@ -292,6 +292,19 @@ class SMBStorageBroker(BaseStorageBroker):
             logger.debug("_create_directory, path = '{}'".format(path))
             self.conn.createDirectory(self.service_name, path)
 
+    def _delete_directory(self, path):
+        if not self._path_exists(path):
+            return
+        for f in self.conn.listPath(self.service_name, path):
+            if f.filename != '.' and f.filename != '..':
+                fpath = os.path.join(path, f.filename)
+                if f.file_attributes & ATTR_DIRECTORY:
+                    self._delete_directory(fpath)
+                    self.conn.deleteDirectory(self.service_name, path)
+                else:
+                    self.conn.deleteFiles(self.service_name, fpath)
+        self.conn.deleteDirectory(self.service_name, path)
+
     # Class methods to override.
 
     @classmethod
@@ -377,8 +390,8 @@ class SMBStorageBroker(BaseStorageBroker):
         parent_directory = os.path.dirname(key)
         self._create_directory(parent_directory)
 
-        f = io.BytesIO(text.encode(self._encoding))
-        self.conn.storeFile(self.service_name, key, f)
+        with io.BytesIO(text.encode(self._encoding)) as f:
+            self.conn.storeFile(self.service_name, key, f)
 
     def delete_key(self, key):
         """Delete the file/object associated with the key."""
@@ -407,10 +420,10 @@ class SMBStorageBroker(BaseStorageBroker):
             return self._hash_cache[fpath]
         except KeyError:
             logger.debug("get_hash, fpath not found in cache")
-            f = io.BytesIO()
-            self.conn.retrieveFile(self.service_name, fpath, f)
             hasher = hashlib.md5()
-            hasher.update(f.getvalue())
+            with io.BytesIO() as f:
+                self.conn.retrieveFile(self.service_name, fpath, f)
+                hasher.update(f.getvalue())
             h = hasher.hexdigest()
             self._hash_cache[fpath] = h
             return h
@@ -573,9 +586,8 @@ class SMBStorageBroker(BaseStorageBroker):
         logger.debug("add_item_metadata, prefix='{}'".format(prefix))
         fpath = prefix + '.{}.json'.format(key)
 
-        f = io.BytesIO()
-        json.dump(value, f)
-        self.conn.storeFile(self.service_name, path, f)
+        with io.BytesIO(json.dumps(value).encode(self._encoding)) as f:
+            self.conn.storeFile(self.service_name, fpath, f)
 
     def get_item_metadata(self, handle):
         """Return dictionary containing all metadata associated with handle.
@@ -600,7 +612,7 @@ class SMBStorageBroker(BaseStorageBroker):
 
         def list_paths(dirname):
             for shf in self.conn.listPath(self.service_name, dirname):
-                if shf.file_attributes & ATTR_NORMAL:
+                if not shf.file_attributes & ATTR_DIRECTORY:
                     yield os.path.join(dirname, shf.filename)
 
         files = [f for f in list_paths(self._metadata_fragments_path)
@@ -609,10 +621,9 @@ class SMBStorageBroker(BaseStorageBroker):
         metadata = {}
         for filename in files:
             key = filename.split('.')[-2]  # filename: identifier.key.json
-            f = io.StringIO()
-            self.conn.retrieveFile(self.service_name, filename, f)
-            f.seek(0)
-            value = json.load(f)
+            with io.BytesIO() as f:
+                self.conn.retrieveFile(self.service_name, filename, f)
+                value = json.loads(f.getvalue().decode(self._encoding))
             metadata[key] = value
 
         return metadata
@@ -644,8 +655,7 @@ class SMBStorageBroker(BaseStorageBroker):
         In the :class:`dtoolcore.storage_broker.DiskStorageBroker` it removes
         the temporary directory for storing item metadata fragment files.
         """
-        if self._path_exists(self._metadata_fragments_path):
-            self.conn.deleteFiles(self.service_name, self._metadata_fragments_path)
+        self._delete_directory(self._metadata_fragments_path)
 
     def _list_historical_readme_keys(self):
         historical_readme_keys = []

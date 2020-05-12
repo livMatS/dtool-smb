@@ -14,13 +14,12 @@ from . import tmp_env_var, tmp_directory
 
 
 def _prefix_contains_something(storage_broker, prefix):
-
-    uuid = storage_broker.uuid
-
+    if not storage_broker._path_exists(prefix):
+        return False
     prefix_objects = list(
-        storage_broker._blobservice.list_blobs(
-            uuid,
-            prefix=prefix
+        storage_broker.conn.listPath(
+            storage_broker.service_name,
+            prefix
         )
     )
     return len(prefix_objects) > 0
@@ -101,7 +100,7 @@ def test_proto_dataset_freeze_functional(tmp_uuid_and_uri):  # NOQA
     # At this point the temporary fragments should exist.
     assert _prefix_contains_something(
         proto_dataset._storage_broker,
-        proto_dataset._storage_broker.fragments_key_prefix
+        proto_dataset._storage_broker._metadata_fragments_path
     )
 
     proto_dataset.put_readme(content='Hello world!')
@@ -115,7 +114,7 @@ def test_proto_dataset_freeze_functional(tmp_uuid_and_uri):  # NOQA
     # Freezing removes the temporary metadata fragments.
     assert not _prefix_contains_something(
         proto_dataset._storage_broker,
-        proto_dataset._storage_broker.fragments_key_prefix
+        proto_dataset._storage_broker._metadata_fragments_path
     )
 
     # Now we shouln't be able to load as a ProtoDataSet
