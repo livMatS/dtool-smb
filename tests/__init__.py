@@ -9,8 +9,8 @@ import pytest
 
 from dtoolcore import generate_admin_metadata
 
-from dtool_azure.storagebroker import (
-    AzureStorageBroker,
+from dtool_smb.storagebroker import (
+    SMBStorageBroker,
 )
 
 _HERE = os.path.dirname(__file__)
@@ -18,7 +18,7 @@ TEST_SAMPLE_DATA = os.path.join(_HERE, "data")
 
 CONFIG_PATH = os.path.expanduser("~/.config/dtool/dtool.json")
 
-AZURE_TEST_BASE_URI = os.getenv("AZURE_TEST_BASE_URI", "azure://dtooltesting")
+SMB_TEST_BASE_URI = os.getenv("SMB_TEST_BASE_URI", "smb://dtooltesting")
 
 
 @contextmanager
@@ -62,9 +62,10 @@ def _get_unicode_from_key(storage_broker, key):
 
 def _remove_dataset(uri):
 
-    storage_broker = AzureStorageBroker(uri, config_path=CONFIG_PATH)
+    storage_broker = SMBStorageBroker(uri, config_path=CONFIG_PATH)
 
-    storage_broker._blobservice.delete_container(storage_broker.uuid)
+    # FIXME! Add deletion of dataset
+    #storage_broker.conn.delete_container(storage_broker.uuid)
 
 
 @pytest.fixture
@@ -72,10 +73,10 @@ def tmp_uuid_and_uri(request):
     admin_metadata = generate_admin_metadata("test_dataset")
     uuid = admin_metadata["uuid"]
 
-    uri = AzureStorageBroker.generate_uri(
+    uri = SMBStorageBroker.generate_uri(
         "test_dataset",
         uuid,
-        AZURE_TEST_BASE_URI
+        SMB_TEST_BASE_URI
     )
 
     @request.addfinalizer
