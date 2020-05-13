@@ -190,30 +190,30 @@ class SMBStorageBroker(BaseStorageBroker):
         )
 
         if not username:
-            raise RuntimeError("No username specified for service '{name}', "
-                               "please set DTOOL_SMB_USERNAME_{name}."
-                               .format(name=config_name))
+            raise KeyError("No username specified for service '{name}', "
+                           "please set DTOOL_SMB_USERNAME_{name}."
+                           .format(name=config_name))
         if not server_name:
-            raise RuntimeError("No server name specified for service '{name}', "
-                               "please set DTOOL_SMB_SERVER_NAME_{name}."
-                               .format(name=config_name))
+            raise KeyError("No server name specified for service '{name}', "
+                           "please set DTOOL_SMB_SERVER_NAME_{name}."
+                           .format(name=config_name))
         if not server_port:
-            raise RuntimeError("No server port specified for service '{name}', "
-                               "please set DTOOL_SMB_SERVER_PORT_{name}."
-                               .format(name=config_name))
+            raise KeyError("No server port specified for service '{name}', "
+                           "please set DTOOL_SMB_SERVER_PORT_{name}."
+                           .format(name=config_name))
         if not domain:
-            raise RuntimeError("No domain specified for service '{name}', "
-                               "please set DTOOL_SMB_DOMAIN_{name}."
-                               .format(name=config_name))
+            raise KeyError("No domain specified for service '{name}', "
+                           "please set DTOOL_SMB_DOMAIN_{name}."
+                           .format(name=config_name))
         if not service_name:
-            raise RuntimeError("No service name specified for service '{name}', "
-                               "please set DTOOL_SMB_SERVICE_NAME_{name}. "
-                               "(The service name is the name of the 'share'.)"
-                               .format(name=config_name))
+            raise KeyError("No service name specified for service '{name}', "
+                           "please set DTOOL_SMB_SERVICE_NAME_{name}. "
+                           "(The service name is the name of the 'share'.)"
+                           .format(name=config_name))
         if not path:
-            raise RuntimeError("No path specified for service '{name}', "
-                               "please set DTOOL_SMB_PATH_{name}."
-                               .format(name=config_name))
+            raise KeyError("No path specified for service '{name}', "
+                           "please set DTOOL_SMB_PATH_{name}."
+                           .format(name=config_name))
 
         # server_port might be string, i.e. if specified via env vars
         if not isinstance(server_port, int):
@@ -293,6 +293,7 @@ class SMBStorageBroker(BaseStorageBroker):
             self.conn.createDirectory(self.service_name, path)
 
     def _delete_directory(self, path):
+        print('DDD', path)
         if not self._path_exists(path):
             return
         for f in self.conn.listPath(self.service_name, path):

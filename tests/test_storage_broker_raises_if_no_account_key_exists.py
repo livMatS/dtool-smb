@@ -5,7 +5,7 @@ import pytest
 
 def test_raises_if_account_is_not_defined():
 
-    from dtool_azure.storagebroker import AzureStorageBroker
+    from dtool_smb.storagebroker import SMBStorageBroker
 
     with pytest.raises(KeyError):
-        AzureStorageBroker("azure://doesnt_exist/fake_UUID")
+        SMBStorageBroker("smb://doesnt_exist/fake_UUID")
