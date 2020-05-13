@@ -394,7 +394,8 @@ class SMBStorageBroker(BaseStorageBroker):
 
     def delete_key(self, key):
         """Delete the file/object associated with the key."""
-        self.conn.deleteFile(self.service_name, key)
+        if self._path_exists(key):
+            self.conn.deleteFiles(self.service_name, key)
 
     def get_size_in_bytes(self, handle):
         """Return the size in bytes."""
