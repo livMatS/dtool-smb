@@ -293,7 +293,6 @@ class SMBStorageBroker(BaseStorageBroker):
             self.conn.createDirectory(self.service_name, path)
 
     def _delete_directory(self, path):
-        print('DDD', path)
         if not self._path_exists(path):
             return
         for f in self.conn.listPath(self.service_name, path):
@@ -301,7 +300,6 @@ class SMBStorageBroker(BaseStorageBroker):
                 fpath = os.path.join(path, f.filename)
                 if f.file_attributes & ATTR_DIRECTORY:
                     self._delete_directory(fpath)
-                    self.conn.deleteDirectory(self.service_name, path)
                 else:
                     self.conn.deleteFiles(self.service_name, fpath)
         self.conn.deleteDirectory(self.service_name, path)
