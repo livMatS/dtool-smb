@@ -27,8 +27,8 @@ def test_list_dataset_uris(tmp_uuid_and_uri):  # NOQA
     proto_dataset.put_item(local_file_path, 'tiny with space.png')
     proto_dataset.freeze()
 
-    from dtool_azure.storagebroker import AzureStorageBroker
-    assert len(AzureStorageBroker.list_dataset_uris(
+    from dtool_smb.storagebroker import SMBStorageBroker
+    assert len(SMBStorageBroker.list_dataset_uris(
         dest_uri,
         CONFIG_PATH)
     ) > 0

@@ -36,28 +36,27 @@ def tmp_directory():
 
 
 def _key_exists_in_storage_broker(storage_broker, key):
-
-    return storage_broker._blobservice.exists(storage_broker.uuid, key)
+    fpath = os.path.join(
+        os.path.join(storage_broker.path, storage_broker.uuid),
+        key
+    )
+    return storage_broker._path_exists(fpath)
 
 
 def _get_data_structure_from_key(storage_broker, key):
-
-    text_blob = storage_broker._blobservice.get_blob_to_text(
-        storage_broker.uuid,
+    fpath = os.path.join(
+        os.path.join(storage_broker.path, storage_broker.uuid),
         key
     )
-
-    return json.loads(text_blob.content)
+    return json.loads(storage_broker.get_text(fpath))
 
 
 def _get_unicode_from_key(storage_broker, key):
-
-    text_blob = storage_broker._blobservice.get_blob_to_text(
-        storage_broker.uuid,
+    fpath = os.path.join(
+        os.path.join(storage_broker.path, storage_broker.uuid),
         key
     )
-
-    return text_blob.content
+    return storage_broker.get_text(fpath)
 
 
 def _remove_dataset(uri):
@@ -65,7 +64,8 @@ def _remove_dataset(uri):
     storage_broker = SMBStorageBroker(uri, config_path=CONFIG_PATH)
 
     # FIXME! Add deletion of dataset
-    #storage_broker.conn.delete_container(storage_broker.uuid)
+    storage_broker._delete_directory(
+        os.path.join(storage_broker.path, storage_broker.uuid))
 
 
 @pytest.fixture
