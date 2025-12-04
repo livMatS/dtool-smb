@@ -1,5 +1,5 @@
-Add Server Message Block (SMB) storage support to dtool
-=======================================================
+Server Message Block (SMB) storage support for dtool
+====================================================
 
 .. image:: https://badge.fury.io/py/dtool-smb.svg
    :target: http://badge.fury.io/py/dtool-smb
