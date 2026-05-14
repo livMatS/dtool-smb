@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dtool-smb"
+version = "0.1.0"
+description = "Add SMB (Server Message Block) dataset support to dtool"
+readme = "README.rst"
+license = {file = "LICENSE.rst"}
+authors = [
+    {name = "Lars Pastewka", email = "lars.pastewka@imtek.uni-freiburg.de"}
+]
+requires-python = ">=3.8"
+dependencies = [
+    "dtoolcore>=3.17",
+    "pysmb",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-cov",
+    "pytz",
+]
+
+[project.urls]
+Repository = "https://github.com/livMatS/dtool-smb"
+
+[project.entry-points."dtool.storage_brokers"]
+SMBStorageBroker = "dtool_smb.storagebroker:SMBStorageBroker"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["dtool_smb*"]

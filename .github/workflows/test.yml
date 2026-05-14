@@ -1,0 +1,33 @@
+name: test
+
+on: [push, pull_request]
+
+# Note: Most tests require a live SMB server and are excluded from this CI
+# workflow. Only the import check and tests that do not require a live SMB
+# connection are run here.
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11']
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-cov pytz
+        pip install -e .
+    - name: Lint
+      run: |
+        pip install flake8
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+    - name: Test (exclude tests requiring live SMB server)
+      run: |
+        pytest -sv \
+          tests/test_storage_broker_raises_if_no_account_key_exists.py
